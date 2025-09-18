@@ -1,0 +1,754 @@
+對機器人發送 command
+POST /rms/mission/robot/command
+Header
+* Authorization: Basic bWlzc2lvbjpudXdhMDA=
+* Content-Type: application/json
+Body
+{
+	missionId: 'uuid-format',
+	uId: '',
+    "triggerId": "xxx",
+
+	command: 'adapter_new_task_notification',
+	sn: '10391ZNNSD240400019',
+
+	//location: '12,34,56',
+	//mapId: 'uuid123',
+	//doorId: '1',
+	//doorEnable: true,
+    
+    location: {
+        coordinate: '3, -0.12464477539064278, -92.35916613258166'
+        name: ''
+        type : location/charger/holding/vendor_machine/location_marker
+    },
+    door: [
+    {
+        id: '0',
+        enable: true/false
+    },{
+        id: '1',
+        enable: true/false
+    }],
+    map: {
+        id: 'map id 456',
+        name: 'xxx',
+        archive: 'https://xxx.xxx.xx/mapid.zip'
+    },
+    orderList: [order1,order2]
+}
+Response
+Success Response
+* Ack 代表 server 成功把指令送給機器人
+{
+    "status": {
+        "code": 0,
+        "message": "OK"
+    },
+    "data": {
+    	result: 'success'
+    }
+}
+Fail Response
+* Ack 代表 server 送給機器人失敗
+{
+    "status": {
+        "code": 0,
+        "message": "OK"
+    },
+    "data": {
+    	result: 'failed'
+    }
+}
+Error Code
+http status 400 - 缺少必要的 header - authorization
+{
+    "status": {
+        "code": "10002",
+        "message": "BAD_REQUEST",
+        "description": child \"authorization\" fails because [\"authorization\" is required]
+    },
+    "data": null
+}
+
+http status 400 - auth 錯誤
+{
+    "status": {
+        "code": "M00001",
+        "message": "NOT_FOUND",
+        "description": "Invalid auth."
+    },
+    "data": null
+}
+
+http status 400 - 錯誤的機器人序號
+{
+    "status": {
+        "code": "M00002",
+        "message": "BAD_REQUEST",
+        "description": "Invalid robot."
+    },
+    "data": null
+}
+MCS Status Response Callback api
+POST https://test-apigw.hkitcloud.net/dev2/auv/api/amhs/robots/status
+用途 : 機器人命令執行狀態Callback回MCS系統 (此為恆康提供之API)
+參考文件 : NUWA AMHS Status Report API-0.0.12
+Header
+* Content-Type: application/json
+Body
+{
+    "missionId": "98dce403-ba10-457b-8b80-e4cc1f458632",
+    "commandId": "198f1881-c958-44ff-9aa1-f50247a6705a",
+    "events":[
+        {
+            "type": "car",
+            "serialNumber": "10391ZNNSD240400019",
+            "occurredTime": "2024-11-22 06:24:00",
+            info: {
+                //used on navigation_status 、 robot_push_mode 
+                value: 0/1 // 0: disable, 1:enable
+            }
+            "status":{
+                "code": 'SUCCESS',  // or ERROR-AP-0001 for exception
+                "description": "somthing..."
+            }
+        }
+     ]
+}
+
+Command Parameter (data structure) defination
+map
+地圖
+* id : 女媧地圖唯一識別碼 (uuid)
+* name : readable naming
+* archive : 若使用下載套用命令( adapter_apply_map )，則此參數會帶入下載點 (https://xxx.xxx.xx/mapid.zip)
+    map: {
+        id: 'map id 456',
+        name: 'xxx',
+        archive: 'https://xxx.xxx.xx/mapid.zip'
+    }
+location
+地標資料
+* coordinate : 基於特定遞圖內, 相對座標x,y,r組成
+* name : readable naming
+* type : 地標種類, String參數類型如下，此類型參數會影響到到點後的行為 
+o location : 一般地標(default, 純移動到達)
+o charger : 充電座(指定到點行為要回充電座) 
+* 7/31 #8119 特別說明，目前ServiceOS 1.5.1 location,yaml尚未支援charger type，現階段需要由MCS針對CH名稱地標，在下導航相關命令時，此type要特別改為"charger"帶下來給機器人
+o holding : 避車點(多車地圖用, 暫時避車點)
+o vending_machine : 智販機 (導航到達後, 自動V型二次精準校正)
+o location_marker : 地圖定位點 (導航到達後, 下次的切換地圖命令adapter_switch_map會自動找同樣名稱地標定位, NOTICE : 地圖上所有同地點名稱應相同)
+    location: {
+        coordinate: '3, -0.12464477539064278, -92.35916613258166'
+        name: 'VM0401',
+        type : 'vending_machine'
+    }
+door
+中層艙門
+* id : 指定艙門id (0/1)
+* enable: 控制被指定之艙門開或關 (true/false
+* (orderList)[#order]
+* 若同時指定兩個艙門，以array方式列入
+* 若非控制命令，系統實作可直接ignore enable資訊
+    door: [{
+        id: '0',
+        enable: true,
+        orderList: [order1,order2]
+    },{
+        id: '1',
+        enable:true,
+        orderList: [order1,order2]
+    }]
+ui_pickup_type
+取物UI類型
+* 0 : 密碼取物介面 (default) 
+o 預設密碼為任務id後四碼，若額外參數 password有指定，則以指定為主
+* 1 : 無密碼取物介面
+    ui_pickup_type: "0"
+password
+指定密碼
+* String type, 用於指定密碼 (通常搭配ui_pickup_type使用)
+* 相關命令 #adapter_pass_opt_password #adapter_pickup_ui
+    password: "7634"
+* 待確認安全性議題 : password恆康加密(ex:hash)，女媧APP解回來 (2025/3/5)
+order
+商品資訊
+* 用於orderList array,之商品單位資料結構
+* type : String 商品類型。 
+o "normal" : 一般商品
+o 未來新類型會增加字串定義
+* name : String 商品名稱
+* size : Int 商品數量
+{
+    type : 'normal',
+    name : 'Bottled water',
+    size : 3
+}
+商品清單範例
+    orderList: [{
+        type : 'normal',
+        name : 'bottled water',
+        size : 1
+    },{
+        type: 'normal',
+        name: 'bath towel',
+        size : 1
+    }]
+middleLayerObject
+中層資訊
+* 定義中層資訊
+* type : String 中層類型id 
+o 已知支援類型
+o "1" : mealDeliveryLayer : 送餐款
+o "2" : securedStorageLayer : 自動門款
+* name : String, Middle Layer Readable Name
+* data : layerObject 中層資訊 
+o layerObject - mealDeliveryLayerObject 
+* maxPlatform : Int 物理中層平台數量 3
+o layerObject - securedStorageLayerObject 
+* maxPlatform : Int 物理中層平台數量 2
+* avaliableStorageIndex : Int Array {0,1}
+* avaliableDoorIndex : Int 允許開關的門編號 {0,1}
+* 如果是ED2電動門，只能開底下的門
+o layerObject - manualDoorLayerObject (手動關門型/舉例用/類似蝦*智取櫃) 
+* maxPlatform : Int 物理中層平台數量 3
+* avaliableStorageIndex : Int Array {0,1,1} 
+* 讀取規則為從上而下，0開始到第一個1，代表幾層櫃被合併
+{
+    type : '2',
+    name : 'Secured Storage Layer',
+    data : {
+        //autoDoorLayerObject
+        maxPlatform : '2',
+        avaliableStorageIndex : {1,1},
+        avaliableDoorIndex : {0,1}
+    }
+
+}
+
+Command response enumerate defination
+此篇幅定義command返回資料之enum value定義(包含 _Response、_Status)
+Navigation Status 移動狀態(int)
+* 0 : MOVING //一般移動中
+* 1 : HOLDING //一般移動遇障停止 (等待障礙物離開後，會繼續移動)
+* 2 : HOLDING ON DP //[TODO]停止於Door Place 開門點帶地標 (注意 : MCS需從PMS Status帶回來此狀態與地點)
+Error Code - Lift Exception 電梯異常錯誤
+共享文件(需授權)
+*
+Error Code - Robot Exception 電梯異常錯誤
+共享文件(需授權)
+超級專送員錯誤資訊Error codeError Def說明初始APP時地圖未就緒ERROR-AP-0001INIT_ERROR_MAP_LOCATION_INITIALING(RobotAPI.getChassisLocationStatus)初始中-LocationStatus.INITIALING初始APP時地圖未就緒ERROR-AP-0002INIT_ERROR_MAP_LOCATION_FAIL(RobotAPI.getChassisLocationStatus)底車沒有定位-LocationStatus.LOCATION_FAIL初始APP時地圖未就緒ERROR-AP-0003INIT_ERROR_MAP_LOCATION_ONGOING(RobotAPI.getChassisLocationStatus)底車定位中-LocationStatus.LOCATION_ONGOING底車連線異常ERROR-AP-0004機器人移動平台無反應無法連線至網路ERROR-AP-0005INIT_ERROR_NO_INTERNET機器人無法連接到網路機型不是自動門款ERROR-AP-0006INIT_ERROR_WRONG_HARDWARE_TYPE超級專送員已調整提供的服務。將不提供自動門功能。未檢測到移動層連線ERROR-AP-0007INIT_ERROR_NO_CHASSIS_LINK機器人的移動層與系統已斷開連線硬體故障ERROR-AP-0008INIT_ERROR_HARDWARE_FAILURE機器人的輪子或馬達發生異常。電池異常ERROR-AP-0009INIT_ERROR_BATTERY_FAILURE機器人電池發生異常場域圖資異常ERROR-AP-0010INIT_ERROR_FIELD_MAP_FAILURE場域圖資異常NuwaRobotApi異常ERROR-AP-0011ROBOT_API_FAILURERobot API 異常NSD未配置到場域ERROR-AP-0012NSD_NOT_ALLOCATENSD未配置導航錯誤ERROR-AP-1001NAVIGATION_FAILED導航指令(ADAPTER_NAVIGATION)到目的地後，底車回覆失敗(帶回底車error code?)回充失敗ERROR-AP-1002NAVIGATION_DOCK_FAILED導航指令(ADAPTER_NAVIGATION)到充電點後，底車回覆失敗(帶回底車error code?)導航錯誤-未定位ERROR-AP-1003NOT_LOCATED_ON_MAP待確認如何定義全域定位失敗ERROR-AP-1004GLOBAL_LOCATED_FAILED執行全域定位指令(globalRelocation)，回覆定位失敗座標定位失敗ERROR-AP-1005LOCAL_LOCATED_FAILED執行座標定位指令(nuwaSlamSetLocation)，回覆定位失敗切換地圖失敗ERROR-AP-1006SWITCH_MAP_FAILED切換地圖(ADAPTER_SWITCH_MAP)失敗切換地圖失敗ERROR-AP-1007APPLY_MAP_FAILED切換地圖(APPLY_SWITCH_MAP)失敗語音撥放異常ERROR-AP-2001語音錯誤(TTS)命令狀態錯誤ERROR-AP-3001錯誤的應用狀態，命令禁止處理艙門控制失敗ERROR-AP-4001MIDDLE_LAYER_CONTROL_FAIED艙門控制失敗(ADAPTER_DELIVERY_MIDDLE_LAYER_CONTROL)任務產生失敗ERROR-AP-4002MISSION_TRIGGER_FAILED任務產生失敗需求清單錯誤ERROR-AP-4003MANUAL_ORDER_FAILED需求清單不存在或格式編碼錯誤Adapter Command list
+任務相關命令
+* adapter_new_task_notification 對裝置發起新任務
+* adapter_task_order_start_time
+AB點導航相關命令
+* adapter_navigation 導航控制
+* adapter_navigation_stop 停止導航
+* adapter_combine_navigation_open_door 導航並開啟艙門(智販機點)
+* adapter_combine_navigation_switch_map 導航並切換地圖 (移動至電梯內切換點切換地圖)
+* adapter_combine_navi_manual_order 導航到點並顯示人工訂單放貨
+* adapter_combine_navi_pickup_ui 導航到點並顯示取物介面 (適用飯店客房)
+地圖操作
+* adapter_switch_map 套用本地地圖
+* adapter_apply_map 下載並套用地圖
+定位相關命令
+* adapter_local_locate 指定地標小區域搜尋定位
+* adapter_global_locate 全地圖搜尋定位
+中層操作
+* adapter_delivery_middle_layer_control 控制指定艙門啟閉
+介面操作
+* adapter_pickup_ui 要求顯示取物介面
+* adapter_charging_ui 要求顯示充電畫面
+密碼傳遞
+* adapter_pass_opt_password 指定密碼(使用訂單後四碼)
+任務控制
+* adapter_interrupt_task : 中斷當下任務
+* adapter_complete_task : 整個任務結束
+* adapter_interrupt_command : 中斷當下命令
+雲端任務暫停與恢復
+* 例如 : 後台管理者，直接遠端某些原因，暫停移動，作完某些排解後，繼續任務，再次執行當次未完成的命令
+* adapter_pause_task
+* adapter_resume_task
+Adapter Command defination
+* ack callback : Success-Response、
+* status callback : MCS Status Response Callback api
+adapter_new_task_notification
+任務 - 新任務通知
+* 開發狀態 : #6950 確認中
+* APP用此作為新任務開始點，並取得missionId，進入狀態機Ready狀態等待命令
+* 備註 : 任務id後四碼，會用於取物解鎖密碼 (2025/1/15 : 恆康評估id來源)
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o new_task_notification_response : 回傳(成功)機器人狀態機已切換至Ready狀態，可以開始被控制。(失敗)機器人狀態機切換異常。
+{
+	missionId: '',    
+	uId: '',
+	command: 'adapter_new_task_notification',
+	sn: '10391ZNNSD240400019',
+
+}
+adapter_task_order_start_time
+任務 - 總任務訂單開始時間
+* 尚未使用，未支援指令
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_task_order_start_time',
+	sn: '10391ZNNSD240400019',
+}
+adapter_navigation
+基礎命令 - AB點導航
+* 開發狀態 : #8119 確認中
+* Parameter 
+o location : 座標點(一般地標/智販點/電梯地圖交換點/CH充電點)
+o 備註 : 機器人端需要根據Location Type，判斷對底車下的不同API 參考定義
+o 備註 : 7/31 #8119 特別說明，目前ServiceOS 1.5.1 location,yaml尚未支援charger type，現階段需要由MCS針對CH名稱地標，在下導航相關命令時，此type要特別改為"charger"帶下來給機器人
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o navigation_status : 回傳導航過程中的狀態(沒有失敗)
+o navigation_response : 回傳導航到點成功或失敗 
+* 一般地標 : onNavigationResult 導航結果成功或失敗
+* 充電座地標 : onDockResult回充電座之成功或失敗
+{
+    missionId: '',
+    uId: '',
+    command: 'adapter_navigation',
+    sn: '10391ZNNSD240400019',
+    location: {
+        coordinate: '3, -0.12464477539064278, -92.35916613258166'
+        name: 'a room',
+        type : location
+    },
+    tts_hint:1
+
+}
+7/31 #8119 如果為CH地標點，雖然地圖原始資料type為location，但MCS需要協助打命令時轉type=charger (ServiceOS 1.5.1)
+{
+    missionId: '',
+    uId: '',
+    command: 'adapter_navigation',
+    sn: '10391ZNNSD240400019',
+    location: {
+        coordinate: '3, -0.12464477539064278, -92.35916613258166'
+        name: 'CH0201',
+        type : 'charger'
+    },
+    tts_hint:1
+}
+adapter_navigation_stop
+基礎命令 - 停止導航
+* 開發狀態 : #10238 機器人已實作，MCS尚未使用與驗證
+* 通常用於遠端停止工作時，要要求機器人停止移動
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o navigation_status : 回傳導航過程中的狀態(沒有失敗)
+o navigation_stop_response : 回傳停止導航成功或失敗
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_navigation_stop',
+	sn: '10391ZNNSD240400019',
+}
+adapter_combine_navigation_open_door
+組合連續命令 - AB點導航 + 開中層櫃門 (適用於智販機到點)
+* 開發狀態 : #8050 已實現
+* Parameter 
+o location/coordinate : 座標點
+o location/type : 地標類型 (智販點)
+o door/id : 指定艙門 0 or 1
+o door/enable : true開 or false關
+* Exception : 若收到adapter_interrupt_task，則完全停止。(MCS要預期艙門可能已經被開，所以後續要補關艙門的命令 or 機器人端自動關門)
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o navigation_status : 回傳導航過程中的狀態(沒有失敗)
+o navigation_response : 回傳導航到點成功或失敗
+o delivery_middle_layer_control_response : 回傳指定艙門是否正確開啟
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_combine_navigation_open_door',
+	sn: '10391ZNNSD240400019',
+
+
+    location: {
+        coordinate: '3, -0.12464477539064278, -92.35916613258166'
+        name: '智販機1',
+        type : 'vending_machine'
+    },
+    door: [{
+        id: '1',
+        enable: true
+    }]
+}
+adapter_combine_navigation_switch_map
+組合連續命令 - AB點導航 + 切換地圖 + 重新定位 (適用於電梯內到點後行為)
+* 開發狀態 : #8120 已實現
+* Parameter 
+o location : 座標點(電梯地圖交換點)
+o mapId: 預計要切換的地圖
+* Exception : 若收到adapter_interrupt_task，則完全停止。 (MCS要預期可能已經切完圖，或重新定位中，後續可能要下重新定位，確保可以移動)
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o navigation_status : 回傳導航過程中的狀態(沒有失敗)
+o navigation_response : 回傳導航到點成功或失敗
+o switch_map_response : 回傳切換本地地圖是否成功
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_combine_navigation_switch_map',
+	sn: '10391ZNNSD240400019',
+
+    location: {
+        coordinate: '3, -0.12464477539064278, -92.35916613258166'
+        name: 'evevator 1',
+        type : location_marker
+    },
+    map: {
+        id: 'map id 456',
+        name: 'xxx',
+        archive: ''
+    },
+}
+adapter_combine_navi_manual_order
+組合連續命令 - AB點導航 + 顯示人工訂單UI介面(指定使用的艙門與放入的訂單內容)
+* 開發狀態 : #8123 已實現
+* 房務人員請求取物(去X點拿東西，送到Y點)的情境，在X點要顯示介面告訴備品人員要放甚麼進去
+* 為了NSD定義無艙門開關流程，需把doorId設定為 -99，且只能有一筆door資料
+* Parameter 
+o location : 座標點(一般地標)
+o doorId : 指定艙門 0 or 1
+o doorEnable : true開 or false關
+o orderList : order array 人工訂單商品order列表
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o navigation_response : 回傳導航到點成功或失敗
+o delivery_middle_layer_control_response : 
+* 艙門失敗時回傳艙門失敗
+* 回傳艙門已成功開啟
+o order_response : 
+* 回傳成功(使用者放物完，關閉好艙門後，按下confirm)
+* 失敗(UI展示異常，控制艙門失敗等等)
+* 備註 : 此命令完整結束的時機點，會是返回order_response success
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_combine_navi_manual_order',
+	sn: '10391ZNNSD240400019',
+
+    location: {
+        coordinate: '3, -0.12464477539064278, -92.35916613258166'
+        name: 'X room',
+        type : location
+    },
+    door: [{
+        id: '1',
+        enable: true,
+        orderList: {order1,order2}
+    }],
+	
+}
+adapter_combine_navi_pickup_ui
+組合連續命令 - AB點導航 + 取物UI介面
+* 開發狀態 : #8049 已實現
+* 用途 : 用於到點後，直接展示取物介面
+* Parameter 
+o location : 座標點(一般地標/智販點/電梯地圖交換點)
+o doorId : 指定此任務之艙門 0 or 1
+o doorEnable : false關
+o ui_pickup_type : 取物UI類型(0:密碼取物 ; 1:無密碼取物)
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o navigation_response : 回傳導航到點成功或失敗
+o navigation_status : 回傳導航過程中的狀態(沒有失敗)
+o delivery_middle_layer_control_response : 艙門失敗時回傳艙門失敗
+o pickup_ui_response : 回傳 
+* (成功)使用者取物完，按下confirm。
+* (失敗)UI展示異常，控制艙門失敗，等待超時(5分鐘)等等。
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_combine_navi_pickup_ui',
+	sn: '10391ZNNSD240400019',
+
+    location: {
+        coordinate: '3, -0.12464477539064278, -92.35916613258166'
+        name: 'X room',
+        type : location
+    },
+    door: {
+        id: '1',
+        enable: false
+    },
+	ui_pickup_type: "0"
+}
+adapter_combine_navi_charging_ui
+組合連續命令 - 導航至CH充電點 + 充電UI介面
+* 開發狀態 : 20250813新需求建立中
+* 用途 : 
+o 用於到點後上充電站 adapter_navigation & type=charger
+o 並直接展示充電介面 adapter_charging_ui
+* Parameter 
+o location : 座標點(type=charger)
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o navigation_response : 回傳導航到點，成功充電或失敗(onDockResult)
+o navigation_status : 回傳導航過程中的狀態(沒有失敗)
+o charging_ui_response : 回傳 
+* 成功 : 充電完成100% (後續觸發MCS結束充電任務，回到SL待命點)
+* 失敗 : 使用者強制結束充電任務
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_combine_navi_charging_ui',
+	sn: '10391ZNNSD240400019',
+
+    location: {
+        coordinate: '3, -0.12464477539064278, -92.35916613258166'
+        name: 'CH0103',
+        type : 'charger'
+    }
+}
+adapter_switch_map
+基礎命令 - 套用裝置端已有之地圖
+* 開發狀態 : #10237 已實現
+* Parameter 
+o mapId : 預計要切換的地圖uuid
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o switch_map_response : 回傳套用成功或失敗
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_switch_map',
+	sn: '10391ZNNSD240400019',
+    
+	map: {
+        id: 'map id 456',
+        name: 'xxx',
+        archive: ''
+    }
+}
+
+adapter_apply_map
+基礎命令 - 下載地圖檔，並套用該地圖
+* 開發狀態 : 未實現
+* Parameter 
+o mapId: 預計要切換的地圖uuid
+o archive: 地圖下載點
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o apply_map_response : 回傳套用成功或失敗(或下載失敗)
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_apply_map',
+	sn: '10391ZNNSD240400019',
+    
+    map: {
+        id: 'map id 456',
+        name: 'xxx',
+        archive: "https://xxxx.xx.xx/xxx.zip"
+    }
+
+}
+adapter_local_locate
+基礎命令 - 本地定位 (指定地標，小範圍定位)
+* 開發狀態 : 機器人已完成，但未使用
+* Parameter 
+o location/coordinate : 地標點座標
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o local_locate_response : 回傳定位成功或失敗(或confirm)
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_local_locate',
+	sn: '10391ZNNSD240400019',
+
+	location: {
+        coordinate: '3, -0.12464477539064278, -92.35916613258166'
+        name: 'X room',
+        type : location
+    },
+}
+adapter_global_locate
+基礎命令 - 全地圖定位
+* 開發狀態 : 未實現
+* 此功能用於全地圖定位，通常是在場域未知位置時使用
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o global_locate_response : 回傳定位成功或失敗(或confirm)
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_global_locate',
+	sn: '10391ZNNSD240400019',
+}
+adapter_delivery_middle_layer_control
+基礎命令 - 中層艙門控制
+* 開發狀態 : #8116 已完成
+* Parameter 
+o door/id : 指定艙門 0 or 1
+o door/enable : 指定艙門 true開 or false關
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o delivery_middle_layer_control_response : 回傳開啟指定艙門成功或失敗
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_delivery_middle_layer_control',
+	sn: '10391ZNNSD240400019',
+           
+    door: [{
+        id: '0',
+        enable: true
+    },{
+        id: '1',
+        enable: true
+    }],
+
+}
+adapter_pass_opt_password
+基礎命令 - 提供opt password
+* 開發狀態 : #9156 已完成
+* Parameter 
+o password : 驗證密碼
+* 備註 : 用於更新既有密碼
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o pass_opt_password_response : 回傳已取得/更新OPT Password成功或失敗
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_pass_opt_password',
+	sn: '10391ZNNSD240400019',
+
+	password: ''
+}
+* 限制 
+o 2025/Q3 目前僅允許「adapter_pickup_ui介面時」接收此指令即時更換密碼
+o 若尚未到取物介面狀態，MCS應透過adapter_pickup_ui之參數帶入新密碼
+adapter_pickup_ui
+基礎命令 - 要求機器人展示取物介面
+* 開發狀態 : #7063 #8121 已完成
+* 用於傳遞密碼 (或更新密碼)
+* Parameter 
+o ui_pickup_type : 取物UI類型(0:密碼取物 ; 1:無密碼取物)
+o password : 指定密碼
+o door : 指定解鎖艙門(單一任務允許雙艙門，以array方式指定)
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o delivery_middle_layer_control_response : 艙門失敗時回傳艙門失敗
+o pickup_ui_response : 回傳 
+* 成功 : 使用者取物完，按下confirm
+* 失敗 : UI展示異常，控制艙門失敗、取物超時(5 min)等等
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_pickup_ui',
+	sn: '10391ZNNSD240400019',
+
+	ui_pickup_type: '0',
+    password: '12345',
+    door: [{         
+        id: '0'
+      },{
+        id: '1'
+      }
+    ]
+}
+adapter_charging_ui
+基礎命令 - 要求機器人展示充電介面
+* 開發狀態 : 20250813 新需求建立中
+* 要求顯示充電畫面 (UI內會定義額外功能，例如點擊結束充電任務)
+* Parameter 
+o N\A
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o charging_ui_response : 回傳 
+* 成功 : 充電完成100% (後續觸發MCS結束充電任務，回到SL待命點)
+* 失敗 : 使用者強制結束充電任務
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_charging_ui',
+	sn: '10391ZNNSD240400019',
+
+	ui_pickup_type: '0',
+
+}
+adapter_pause_task
+基礎命令 - 暫停任務
+* 開發狀態 : 未實現
+* 雲端對機器人下暫停任務命令，可能用於exception control暫停任務，後續排除後，應執行adapter_resume_task
+* 機器人端會視missionId僅暫停，理論上下一次命令應該收到同一個missionId
+* 例如 : 後台管理者，直接遠端某些原因，暫停移動，作完某些排解後，繼續任務，再次執行當次未完成的命令
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o pause_task_response : 回傳暫停狀態機成功或失敗
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_pause_task',
+	sn: '10391ZNNSD240400019',
+}
+adapter_resume_task
+基礎命令 - 恢復任務
+* 開發狀態 : 未實現
+* 機器人端會視missionId僅暫停，理論上下一次命令應該收到同一個missionId
+* 例如 : 後台管理者，直接遠端某些原因，暫停移動，作完某些排解後，繼續任務，再次執行當次未完成的命令
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o resume_task_response : 回傳恢復狀態機成功或失敗
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_resume_task',
+	sn: '10391ZNNSD240400019',
+}
+adapter_interrupt_task
+基礎命令 - 取消任務
+* 開發狀態 : #10236 已完成
+* 雲端對機器人下取消任務命令 (後續應控制機器人移動)
+* 機器人端會視missionId已結束，理論上下一次命令應該收到新的missionId
+* 使用時機 : 若MCS要重新派送任務，需對當下的missionId下 adapter_interrupt_task 命令，讓機器人APP狀態機強制回到State-Idle等待新任務
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o interrupt_task_response : 回傳(成功)機器人狀態機回到Idle。(失敗)狀態機切換異常，可能還在處理其他任務。
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_interrupt_task',
+	sn: '10391ZNNSD240400019',
+}
+adapter_complete_task
+基礎命令 - 任務結束通知
+* 開發狀態 : #8122 已完成
+* 雲端告知機器人該任務所有命令結束
+* 機器人端會視missionId已結束，理論上下一次命令應該收到新的missionId
+* 使用時機 : MCS已控制完當下任務的全部命令，需對當下的missionId下 adapter_complete_task 命令，讓機器人APP狀態機回到State Idle等待新任務
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o complete_task_response : 回傳(成功)機器人狀態機回到Idle。(失敗)狀態機切換異常，可能還在處理其他任務。
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_complete_task',
+	sn: '10391ZNNSD240400019',
+}
+adapter_interrupt_command
+基礎命令 - 中斷當命令行為要求
+* 開發狀態 : 待建立Feature單
+* 雲端告知機器人停止當下命令行為，但依然隸屬於missionId任務內
+* 使用時機 : MCS可能異常處理會需要改變機器人流程，在此之前需對當下的missionId下 adapter_interrupt_command 命令停止機器人當下命令行為，機器人需要根據當下命令類型停止命令，讓機器人APP狀態機回到State Ready等待新命令
+* Response list 
+o Ack : 確認機器人端已收到命令，開始執行
+o interrupt_command_response : 回傳(成功)機器人狀態機回到Ready。(失敗)狀態機切換異常，可能還在處理其他任務。
+{
+	missionId: '',
+	uId: '',
+	command: 'adapter_interrupt_command',
+	sn: '10391ZNNSD240400019',
+}
+
