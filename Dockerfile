@@ -9,6 +9,7 @@ RUN rm -f index.html
 
 # Copy the static content of our web application
 COPY index.html .
+COPY favicon.svg .
 COPY js/ ./js/
 
 # Expose port 80 to allow traffic to Nginx
