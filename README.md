@@ -1,96 +1,84 @@
-# MCS Blockly 任務編輯器
-
-這是一個使用 Google Blockly 建立的視覺化任務編輯器，可以讓使用者透過拖拉積木的方式，組合出控制機器人的任務流程，並產生對應的 JavaScript 程式碼。
-
-此專案已使用 Docker 進行容器化，可以輕鬆地在任何支援 Docker 的環境中進行部署。
+# MCS Blockly KMP Mission Planner
+## (MCS Blockly KMP 任務編輯器)
 
 ---
 
-## 本地端運行 (Local Build & Run)
+## 🇬🇧 English
 
-### 必要條件
+### About The Project
 
-- 您需要在您的電腦上安裝 [Docker](https://www.docker.com/get-started)。
+This is a Kotlin Multiplatform (KMP) project that provides a visual mission editor for a robot API, built with the Blockly library. The goal is to allow users to build robot command sequences visually, which can then be executed on multiple platforms.
 
-### 步驟
+This project targets:
+- **Web (JS)**: A fully functional web application.
+- **Android**: A basic application shell.
+- **iOS**: A basic application shell.
 
-1.  **建立 Docker 映像檔 (Build the Docker Image):**
+### Modules
 
-    在專案的根目錄下（也就是 `Dockerfile` 所在的目錄），打開您的終端機，然後執行以下指令來建立映像檔。我們將它命名為 `mcs-blockly-planner`。
+- `:shared`: The main KMP module containing all the shared business logic, data models, API client (Ktor), and the Blockly web UI implementation in `jsMain`.
+- `:androidApp`: A standard Android application module that depends on the `:shared` module.
+
+### How to Run the Web Application
+
+**Prerequisites:**
+- JDK 11 or higher.
+
+**Instructions:**
+
+1.  **Run the development server:**
+
+    Open a terminal in the root directory of the project and run the following Gradle command. This will start a development server with live-reloading.
 
     ```bash
-    docker build -t mcs-blockly-planner .
+    ./gradlew :shared:jsBrowserDevelopmentRun --continuous
     ```
 
-2.  **運行 Docker 容器 (Run the Docker Container):**
+2.  **Open the web page:**
 
-    映像檔建立成功後，執行以下指令來啟動一個容器：
-
-    ```bash
-    docker run -p 8080:80 --name mcs-planner-container mcs-blockly-planner
-    ```
-
-    *   `-p 8080:80`：這個參數會將您電腦的 8080 連接埠，對應到容器內部的 80 連接埠。
-    *   `--name mcs-planner-container`: 為您的容器取一個方便識別的名稱。
-
-3.  **開啟預覽網頁:**
-
-    打開您的網頁瀏覽器，並訪問以下網址：
+    Once the build is complete and the server is running, open your web browser and navigate to:
 
     [http://localhost:8080](http://localhost:8080)
 
-    您應該能看到 Blockly 任務編輯器的介面。
-
-4.  **停止容器 (可選):**
-
-    當您預覽完畢，可以執行以下指令來停止並移除容器：
-    ```bash
-    docker stop mcs-planner-container
-    docker rm mcs-planner-container
-    ```
+    You should see the Blockly Mission Planner interface. Any changes you make to the source code in `shared/src/jsMain` will trigger an automatic reload in the browser.
 
 ---
 
-## 雲端部署指南 (Cloud Deployment Guide)
+## 🇹🇼 中文 (Traditional Chinese)
 
-將此應用程式部署到雲端服務（如 AWS, Google Cloud, Azure）的通用流程如下：
+### 關於此專案
 
-### 1. 將映像檔推送到容器倉庫 (Push Image to a Registry)
+這是一個 Kotlin Multiplatform (KMP) 專案，提供一個基於 Blockly 函式庫的視覺化機器人任務編輯器。專案的目標是讓使用者可以透過視覺化的方式來組合機器人命令序列，並在多個平台上執行。
 
-雲端平台需要從一個集中的地方來拉取您的 Docker 映像檔。這個地方就叫做容器倉庫 (Container Registry)。
+專案目標平台：
+- **網頁 (JS)**: 一個功能完整的網頁應用程式。
+- **Android**: 一個基本的應用程式外殼。
+- **iOS**: 一個基本的應用程式外殼。
 
-a.  **登入您的容器倉庫:**
-    (以 Docker Hub 為例)
+### 模組說明
+
+- `:shared`: 主要的 KMP 模組，包含了所有的共享業務邏輯、資料模型、API 客戶端 (Ktor)，以及在 `jsMain` 中實作的 Blockly 網頁介面。
+- `:androidApp`: 一個標準的 Android 應用程式模組，它依賴於 `:shared` 模組。
+
+### 如何運行網頁版應用程式
+
+**必要條件：**
+- JDK 11 或更高版本。
+
+**操作說明：**
+
+1.  **運行開發伺服器：**
+
+    在專案的根目錄下打開終端機，並執行以下 Gradle 指令。此指令會啟動一個支援即時重載的開發伺-服器。
+
     ```bash
-    docker login
-    ```
-    (如果您使用 AWS ECR, GCP Artifact Registry, 請參考其對應的登入指令)
-
-b.  **為您的映像檔打上標籤 (Tag the Image):**
-    將您剛才建立的本地映像檔，重新標記成符合您倉庫路徑的格式。
-
-    ```bash
-    # 格式: docker tag <本地映像檔名稱> <倉庫使用者名稱>/<倉庫映像檔名稱>:<版本標籤>
-    docker tag mcs-blockly-planner your-docker-username/mcs-blockly-planner:latest
+    ./gradlew :shared:jsBrowserDevelopmentRun --continuous
     ```
 
-c.  **推送映像檔 (Push the Image):**
-    ```bash
-    docker push your-docker-username/mcs-blockly-planner:latest
-    ```
+2.  **開啟網頁：**
 
-### 2. 從雲端平台部署 (Deploy from Cloud Platform)
+    當建置完成且伺服器開始運行後，打開您的網頁瀏覽器並前往以下網址：
 
-現在您的映像檔已經在倉庫中了，您可以到您的雲端服務供應商的控制台，選擇一個適合的服務來部署它。
+    [http://localhost:8080](http://localhost:8080)
 
-推薦的服務類型（通常稱為 "Serverless Containers" 或 "Container as a Service"）：
-
--   **AWS App Runner**
--   **Google Cloud Run**
--   **Azure Container Apps**
-
-在這些服務的建立介面中，您通常只需要：
--   選擇 "從容器倉庫部署"。
--   提供您剛才推送的映像檔路徑 (e.g., `your-docker-username/mcs-blockly-planner:latest`)。
--   設定容器要使用的連接埠為 **80**。
--   點擊建立/部署，雲端平台就會自動為您處理剩下的事情，並提供一個公開的網址。
+    您應該能看到 Blockly 任務編輯器的介面。當您修改 `shared/src/jsMain` 中的原始碼時，瀏覽器將會自動重新載入。
